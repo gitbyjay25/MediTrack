@@ -53,10 +53,10 @@ Thumbs.db
 # Data files (keep structure, ignore actual data)
 medicine.txt
 interaction.txt
-medicine_clean.csv
-interaction_clean.csv
 dta.docx
-dta.pdf
+
+# Database data folder
+database/data/
 
 # Temporary files
 *.tmp

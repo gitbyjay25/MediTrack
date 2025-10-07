@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - MediTrek{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Medication Dashboard</h2>
+    <a href="/add_medicine" class="btn btn-success">Add Medicine</a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4>Active Medicines</h4>
+            </div>
+            <div class="card-body">
+                {% if medicines %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Medicine</th>
+                                    <th>Dosage</th>
+                                    <th>Frequency</th>
+                                    <th>Adherence</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for medicine in medicines %}
+                                <tr>
+                                    <td>{{ medicine.med_name }}</td>
+                                    <td>{{ medicine.dosage }}</td>
+                                    <td>{{ medicine.frequency }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if medicine.adherence >= 80 %}success{% elif medicine.adherence >= 60 %}warning{% else %}danger{% endif %}">
+                                            {{ medicine.adherence }}%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="/take_dose/{{ medicine.id }}" class="btn btn-success btn-sm">Take</a>
+                                        <a href="/miss_dose/{{ medicine.id }}" class="btn btn-warning btn-sm">Miss</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No active medicines found. <a href="/add_medicine">Add your first medicine</a></p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h4>Quick Actions</h4>
+            </div>
+            <div class="card-body">
+                <a href="/add_medicine" class="btn btn-primary w-100 mb-2">Add Medicine</a>
+                <a href="/recommendations" class="btn btn-info w-100 mb-2">Medicine Recommendations</a>
+                <a href="/dashboard" class="btn btn-secondary w-100">Refresh Dashboard</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

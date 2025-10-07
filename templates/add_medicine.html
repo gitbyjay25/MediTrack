@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Add Medicine - MediTrek{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4>Add New Medicine</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/add_medicine">
+                    <div class="mb-3">
+                        <label class="form-label">Medicine Name</label>
+                        <input type="text" class="form-control" name="med_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Dosage</label>
+                        <input type="text" class="form-control" name="dosage" placeholder="e.g., 500mg" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Frequency</label>
+                        <select class="form-control" name="frequency" required>
+                            <option value="">Select frequency</option>
+                            <option value="once daily">Once Daily</option>
+                            <option value="twice daily">Twice Daily</option>
+                            <option value="three times daily">Three Times Daily</option>
+                            <option value="every 8 hours">Every 8 Hours</option>
+                            <option value="every 12 hours">Every 12 Hours</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Purpose (Optional)</label>
+                        <textarea class="form-control" name="purpose" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">Add Medicine</button>
+                </form>
+                
+                <div class="text-center mt-3">
+                    <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

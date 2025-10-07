@@ -1,5 +1,4 @@
--- Updated database schema for WHO Essential Medicines List
--- Drop existing tables if they exist
+
 DROP TABLE IF EXISTS interactions;
 DROP TABLE IF EXISTS medicines;
 DROP TABLE IF EXISTS recommendations;
@@ -88,15 +87,14 @@ CREATE TABLE dose_logs (
 CREATE TABLE recommendations (
     id INT AUTO_INCREMENT PRIMARY KEY,
     medicine_name VARCHAR(200) NOT NULL,
-    condition VARCHAR(200),
+    medical_condition VARCHAR(200),
     recommendation_text TEXT NOT NULL,
     confidence_score DECIMAL(3,2) DEFAULT 0.80,
     source VARCHAR(100) DEFAULT 'WHO Essential Medicines List',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_medicine_name (medicine_name),
-    INDEX idx_condition (condition)
+    INDEX idx_medical_condition (medical_condition)
 );
-
 -- Create user_medicine_history table
 CREATE TABLE user_medicine_history (
     id INT AUTO_INCREMENT PRIMARY KEY,

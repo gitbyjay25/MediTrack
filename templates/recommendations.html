@@ -18,21 +18,23 @@
                 <table class="table table-hover">
                     <thead>
                         <tr>
-                            <th>Illness/Condition</th>
+                            <th>Medical Condition</th>
                             <th>Medicine</th>
-                            <th>Dosage</th>
-                            <th>Frequency</th>
-                            <th>Description</th>
+                            <th>Recommendation</th>
+                            <th>Confidence</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for rec in recommendations %}
                         <tr>
-                            <td class="fw-bold">{{ rec.illness }}</td>
-                            <td>{{ rec.med_name }}</td>
-                            <td>{{ rec.dosage_suggestion or 'As prescribed' }}</td>
-                            <td>{{ rec.frequency_suggestion or 'As needed' }}</td>
-                            <td>{{ rec.description or '-' }}</td>
+                            <td class="fw-bold">{{ rec.medical_condition or 'General' }}</td>
+                            <td>{{ rec.medicine_name }}</td>
+                            <td>{{ rec.recommendation_text }}</td>
+                            <td>
+                                <span class="badge bg-{% if rec.confidence_score >= 0.8 %}success{% elif rec.confidence_score >= 0.6 %}warning{% else %}secondary{% endif %}">
+                                    {{ "%.0f"|format(rec.confidence_score * 100) }}%
+                                </span>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>

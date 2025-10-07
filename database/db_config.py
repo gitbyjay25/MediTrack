@@ -1,15 +1,13 @@
-# Database configuration
 import pymysql
-from config import Config
+import config
 
 def get_db_connection():
-    """Get database connection"""
     try:
         connection = pymysql.connect(
-            host='localhost',
-            user='root',
-            password='password',
-            database='meditrek',
+            host=config.DB_HOST,
+            user=config.DB_USER,
+            password=config.DB_PASSWORD,
+            database=config.DB_NAME,
             charset='utf8mb4',
             cursorclass=pymysql.cursors.DictCursor
         )
@@ -19,7 +17,6 @@ def get_db_connection():
         return None
 
 def execute_query(query, params=None):
-    """Execute database query"""
     connection = get_db_connection()
     if not connection:
         return None

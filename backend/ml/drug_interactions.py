@@ -1,15 +1,17 @@
 # Simple drug interaction checker
-import random
 from database.db_config import execute_query
 
 def check_drug_interaction(med1, med2):
-    """Check for drug interaction between two medicines"""
-    
-    # Check database first
     query = """
         SELECT * FROM interactions 
-        WHERE (med1 = %s AND med2 = %s) OR (med1 = %s AND med2 = %s)
-        ORDER BY severity_level DESC 
+        WHERE (drug1 = %s AND drug2 = %s) OR (drug1 = %s AND drug2 = %s)
+        ORDER BY 
+            CASE severity_level 
+                WHEN 'High' THEN 1 
+                WHEN 'Medium' THEN 2 
+                WHEN 'Low' THEN 3 
+                ELSE 4 
+            END
         LIMIT 1
     """
     result = execute_query(query, (med1, med2, med2, med1))
@@ -21,39 +23,5 @@ def check_drug_interaction(med1, med2):
             'description': interaction['description'],
             'recommendation': interaction['recommendation']
         }
-    
-    # If no database interaction found, use simple rules
-    interaction = check_basic_interactions(med1, med2)
-    return interaction
-
-def check_basic_interactions(med1, med2):
-    """Basic rule-based interaction checking"""
-    
-    # Simple interaction rules
-    interactions = [
-        {
-            'meds': ['aspirin', 'wafarin'],
-            'severity': 'high',
-            'description': 'Increased bleeding risk',
-            'recommendation': 'Monitor bleeding closely'
-        },
-        {
-            'meds': ['aspirin', 'ibuprofen'],
-            'severity': 'medium',
-            'description': 'Gastric irritation risk',
-            'recommendation': 'Take with food, monitor stomach'
-        }  
-    ]
-    
-    med1_lower = med1.lower()
-    med2_lower = med2.lower()
-    
-    for interaction in interactions:
-        if med1_lower in interaction['meds'] and med2_lower in interaction['meds']:
-            return {
-                'severity': interaction['severity'],
-                'description': interaction['description'],
-                'recommendation': interaction['recommendation']
-            }
     
     return None

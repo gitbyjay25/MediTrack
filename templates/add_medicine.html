@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-md-8">
         <div class="card">
             <div class="card-header">
                 <h4>Add New Medicine</h4>
@@ -13,7 +13,8 @@
                 <form method="POST" action="/add_medicine">
                     <div class="mb-3">
                         <label class="form-label">Medicine Name</label>
-                        <input type="text" class="form-control" name="med_name" required>
+                        <input type="text" class="form-control" name="med_name" id="med_name" required>
+                        <div id="medicine_suggestions" class="list-group mt-2" style="display: none;"></div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Dosage</label>
@@ -44,4 +45,43 @@
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('med_name').addEventListener('input', function() {
+    const query = this.value;
+    const suggestions = document.getElementById('medicine_suggestions');
+    
+    if (query.length < 2) {
+        suggestions.style.display = 'none';
+        return;
+    }
+    
+    fetch(`/search_medicine?q=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            suggestions.innerHTML = '';
+            if (data.length > 0) {
+                data.forEach(med => {
+                    const item = document.createElement('div');
+                    item.className = 'list-group-item list-group-item-action';
+                    item.innerHTML = `<strong>${med.med_name}</strong><br><small>${med.dosage_form} - ${med.therapeutic_class}</small>`;
+                    item.onclick = () => {
+                        document.getElementById('med_name').value = med.med_name;
+                        suggestions.style.display = 'none';
+                    };
+                    suggestions.appendChild(item);
+                });
+                suggestions.style.display = 'block';
+            } else {
+                suggestions.style.display = 'none';
+            }
+        });
+});
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#med_name') && !e.target.closest('#medicine_suggestions')) {
+        document.getElementById('medicine_suggestions').style.display = 'none';
+    }
+});
+</script>
 {% endblock %}

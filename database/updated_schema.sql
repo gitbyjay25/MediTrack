@@ -6,6 +6,8 @@ DROP TABLE IF EXISTS dose_logs;
 DROP TABLE IF EXISTS user_medicine_history;
 DROP TABLE IF EXISTS schedules;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS medicine_recommendations;
+DROP TABLE IF EXISTS dosage_optimization;
 
 -- Create users table
 CREATE TABLE users (
@@ -130,4 +132,28 @@ CREATE TABLE schedules (
     INDEX idx_user_id (user_id),
     INDEX idx_medicine_id (medicine_id),
     INDEX idx_is_active (is_active)
+);
+
+-- Create medicine_recommendations table (from Gemini data)
+CREATE TABLE medicine_recommendations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    medicine_name VARCHAR(200) NOT NULL,
+    primary_conditions TEXT,
+    secondary_conditions TEXT,
+    age_group_recommendations TEXT,
+    contraindications TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_medicine_name (medicine_name)
+);
+
+-- Create dosage_optimization table (from Gemini data)
+CREATE TABLE dosage_optimization (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    medicine_name VARCHAR(200) NOT NULL,
+    adult_dosage VARCHAR(200),
+    pediatric_dosage TEXT,
+    elderly_dosage TEXT,
+    weight_based_adjustments TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_medicine_name (medicine_name)
 );

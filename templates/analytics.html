@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics Dashboard - TrackMedi{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-purple-700 mb-4">
+            <i class="fas fa-chart-line mr-3"></i>Analytics Dashboard
+        </h1>
+        <p class="text-xl text-gray-600">Track your medicine adherence and health insights</p>
+    </div>
+
+    {% if analytics %}
+    <!-- Overview Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Total Medicines -->
+        <div class="bg-gradient-to-br from-blue-400 to-purple-500 rounded-xl p-6 text-white shadow-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold">Total Medicines</h3>
+                    <p class="text-3xl font-bold">{{ analytics.overview.total_medicines }}</p>
+                </div>
+                <i class="fas fa-pills text-4xl opacity-80"></i>
+            </div>
+        </div>
+
+        <!-- Compliance Score -->
+        <div class="bg-gradient-to-br from-green-400 to-teal-500 rounded-xl p-6 text-white shadow-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold">Compliance Score</h3>
+                    <p class="text-3xl font-bold">{{ analytics.overview.compliance_score }}%</p>
+                </div>
+                <i class="fas fa-check-circle text-4xl opacity-80"></i>
+            </div>
+        </div>
+
+        <!-- Doses Taken -->
+        <div class="bg-gradient-to-br from-orange-400 to-red-500 rounded-xl p-6 text-white shadow-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold">Doses Taken</h3>
+                    <p class="text-3xl font-bold">{{ analytics.overview.total_doses_taken }}</p>
+                </div>
+                <i class="fas fa-calendar-check text-4xl opacity-80"></i>
+            </div>
+        </div>
+
+        <!-- Doses Missed -->
+        <div class="bg-gradient-to-br from-pink-400 to-rose-500 rounded-xl p-6 text-white shadow-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold">Doses Missed</h3>
+                    <p class="text-3xl font-bold">{{ analytics.overview.total_doses_missed }}</p>
+                </div>
+                <i class="fas fa-calendar-times text-4xl opacity-80"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Weekly & Monthly Analytics -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Weekly Analytics -->
+        <div class="bg-white rounded-xl p-6 shadow-lg">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">
+                <i class="fas fa-calendar-week mr-2 text-blue-500"></i>Weekly Performance
+            </h3>
+            <div class="text-center">
+                <div class="text-4xl font-bold text-blue-600 mb-2">{{ analytics.weekly.adherence_rate }}%</div>
+                <p class="text-gray-600">Adherence Rate</p>
+                <div class="mt-4">
+                    <div class="flex justify-between text-sm text-gray-600 mb-2">
+                        <span>Days with medicines: {{ analytics.weekly.days_with_medicines }}</span>
+                        <span>Total days: {{ analytics.weekly.total_days }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-blue-500 h-2 rounded-full" style="width: {{ analytics.weekly.adherence_rate }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Analytics -->
+        <div class="bg-white rounded-xl p-6 shadow-lg">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">
+                <i class="fas fa-calendar-alt mr-2 text-green-500"></i>Monthly Performance
+            </h3>
+            <div class="text-center">
+                <div class="text-4xl font-bold text-green-600 mb-2">{{ analytics.monthly.adherence_rate }}%</div>
+                <p class="text-gray-600">Adherence Rate</p>
+                <div class="mt-4">
+                    <div class="flex justify-between text-sm text-gray-600 mb-2">
+                        <span>Weeks with data: {{ analytics.monthly.weeks_with_data }}</span>
+                        <span>Total weeks: {{ analytics.monthly.total_weeks }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-green-500 h-2 rounded-full" style="width: {{ analytics.monthly.adherence_rate }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Medicine Categories -->
+    {% if analytics.categories %}
+    <div class="bg-white rounded-xl p-6 shadow-lg mb-8">
+        <h3 class="text-xl font-semibold text-gray-800 mb-6">
+            <i class="fas fa-layer-group mr-2 text-purple-500"></i>Medicine Categories
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for category, data in analytics.categories.items() %}
+            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <h4 class="font-semibold text-gray-800 mb-2">{{ category }}</h4>
+                <div class="text-sm text-gray-600 mb-2">
+                    <span class="font-medium">{{ data.count }}</span> medicines
+                </div>
+                <div class="text-sm text-gray-600 mb-2">
+                    Avg Adherence: <span class="font-medium text-green-600">{{ data.avg_adherence }}%</span>
+                </div>
+                <div class="text-xs text-gray-500">
+                    {% for medicine in data.medicines[:3] %}
+                        {{ medicine }}{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                    {% if data.medicines|length > 3 %}...{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Timing Analytics -->
+    <div class="bg-white rounded-xl p-6 shadow-lg mb-8">
+        <h3 class="text-xl font-semibold text-gray-800 mb-6">
+            <i class="fas fa-clock mr-2 text-orange-500"></i>Medicine Timing Patterns
+        </h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="text-center">
+                <div class="text-2xl font-bold text-yellow-600 mb-1">{{ analytics.timing.morning }}</div>
+                <p class="text-sm text-gray-600">Morning</p>
+                <p class="text-xs text-gray-500">6 AM - 12 PM</p>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-orange-600 mb-1">{{ analytics.timing.afternoon }}</div>
+                <p class="text-sm text-gray-600">Afternoon</p>
+                <p class="text-xs text-gray-500">12 PM - 6 PM</p>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-purple-600 mb-1">{{ analytics.timing.evening }}</div>
+                <p class="text-sm text-gray-600">Evening</p>
+                <p class="text-xs text-gray-500">6 PM - 12 AM</p>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-indigo-600 mb-1">{{ analytics.timing.night }}</div>
+                <p class="text-sm text-gray-600">Night</p>
+                <p class="text-xs text-gray-500">12 AM - 6 AM</p>
+            </div>
+        </div>
+        {% if analytics.timing.best_time %}
+        <div class="mt-4 text-center">
+            <p class="text-sm text-gray-600">
+                <i class="fas fa-star text-yellow-500 mr-1"></i>
+                Best time: <span class="font-semibold">{{ analytics.timing.best_time }}</span>
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Trends -->
+    <div class="bg-white rounded-xl p-6 shadow-lg mb-8">
+        <h3 class="text-xl font-semibold text-gray-800 mb-6">
+            <i class="fas fa-trending-up mr-2 text-green-500"></i>Adherence Trends
+        </h3>
+        <div class="text-center">
+            <div class="text-3xl font-bold mb-2
+                {% if analytics.trends.direction == 'improving' %}text-green-600
+                {% elif analytics.trends.direction == 'declining' %}text-red-600
+                {% else %}text-gray-600{% endif %}">
+                {% if analytics.trends.direction == 'improving' %}📈 Improving
+                {% elif analytics.trends.direction == 'declining' %}📉 Declining
+                {% else %}➡️ Stable{% endif %}
+            </div>
+            {% if analytics.trends.trend_percentage != 0 %}
+            <p class="text-gray-600">
+                {{ analytics.trends.trend_percentage }}% change over time
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Insights -->
+    {% if analytics.insights %}
+    <div class="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 shadow-lg">
+        <h3 class="text-xl font-semibold text-gray-800 mb-6">
+            <i class="fas fa-lightbulb mr-2 text-yellow-500"></i>Personalized Insights
+        </h3>
+        <div class="space-y-3">
+            {% for insight in analytics.insights %}
+            <div class="flex items-start">
+                <i class="fas fa-arrow-right text-purple-500 mt-1 mr-3"></i>
+                <p class="text-gray-700">{{ insight }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- No Analytics Available -->
+    <div class="text-center py-16">
+        <i class="fas fa-chart-line text-8xl text-gray-300 mb-6"></i>
+        <h2 class="text-2xl font-semibold text-gray-600 mb-4">Analytics Not Available</h2>
+        <p class="text-gray-500 text-lg">Start taking your medicines to see detailed analytics!</p>
+        <a href="/dashboard" class="mt-6 inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Auto-refresh analytics every 60 seconds
+setInterval(function() {
+    location.reload();
+}, 60000);
+</script>
+{% endblock %}

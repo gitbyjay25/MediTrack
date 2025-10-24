@@ -1,11 +1,8 @@
 
 DROP TABLE IF EXISTS interactions;
 DROP TABLE IF EXISTS medicines;
-DROP TABLE IF EXISTS recommendations;
-DROP TABLE IF EXISTS dose_logs;
-DROP TABLE IF EXISTS user_medicine_history;
-DROP TABLE IF EXISTS schedules;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS user_medicines;
 DROP TABLE IF EXISTS medicine_recommendations;
 DROP TABLE IF EXISTS dosage_optimization;
 
@@ -23,6 +20,18 @@ CREATE TABLE users (
     emergency_phone VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    -- Gamification columns
+    streak_days INT DEFAULT 0,
+    total_points INT DEFAULT 0,
+    level INT DEFAULT 1,
+    badges TEXT,
+    last_streak_date DATE,
+    longest_streak INT DEFAULT 0,
+    -- Analytics columns
+    total_medicines_taken INT DEFAULT 0,
+    total_doses_missed INT DEFAULT 0,
+    avg_adherence_rate DECIMAL(5,2) DEFAULT 0.00,
+    last_analytics_update DATETIME,
     INDEX idx_username (username),
     INDEX idx_email (email)
 );
@@ -69,72 +78,40 @@ CREATE TABLE interactions (
     INDEX idx_severity (severity_level)
 );
 
--- Create dose_logs table
-CREATE TABLE dose_logs (
+-- Create user_medicines table (main user medicine tracking)
+CREATE TABLE user_medicines (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    medicine_id INT NOT NULL,
-    dose_taken DECIMAL(10,2),
-    dose_unit VARCHAR(20),
-    taken_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    notes TEXT,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (medicine_id) REFERENCES medicines(id) ON DELETE CASCADE,
-    INDEX idx_user_id (user_id),
-    INDEX idx_medicine_id (medicine_id),
-    INDEX idx_taken_at (taken_at)
-);
-
--- Create recommendations table
-CREATE TABLE recommendations (
-    id INT AUTO_INCREMENT PRIMARY KEY,
     medicine_name VARCHAR(200) NOT NULL,
-    medical_condition VARCHAR(200),
-    recommendation_text TEXT NOT NULL,
-    confidence_score DECIMAL(3,2) DEFAULT 0.80,
-    source VARCHAR(100) DEFAULT 'WHO Essential Medicines List',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_medicine_name (medicine_name),
-    INDEX idx_medical_condition (medical_condition)
-);
--- Create user_medicine_history table
-CREATE TABLE user_medicine_history (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    medicine_id INT NOT NULL,
-    start_date DATE,
-    end_date DATE,
     dosage VARCHAR(100),
     frequency VARCHAR(100),
-    prescribed_by VARCHAR(100),
-    notes TEXT,
+    age_group VARCHAR(50),
+    weight DECIMAL(5,2),
+    height DECIMAL(5,2),
+    gender VARCHAR(20),
+    purpose TEXT,
+    medical_conditions TEXT,
+    allergies TEXT,
+    adherence_score INT DEFAULT 100,
+    reminder_times TEXT,
+    reminder_enabled BOOLEAN DEFAULT TRUE,
+    status ENUM('active', '0') DEFAULT 'active',
+    daily_doses_taken INT DEFAULT 0,
+    total_doses_required INT DEFAULT 1,
+    last_taken_date DATE,
+    last_taken TIMESTAMP,
+    taken_count INT DEFAULT 0,
+    missed_count INT DEFAULT 0,
+    last_week_adherence DECIMAL(5,2) DEFAULT 0.00,
+    last_month_adherence DECIMAL(5,2) DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (medicine_id) REFERENCES medicines(id) ON DELETE CASCADE,
     INDEX idx_user_id (user_id),
-    INDEX idx_medicine_id (medicine_id)
+    INDEX idx_medicine_name (medicine_name),
+    INDEX idx_status (status)
 );
 
--- Create schedules table
-CREATE TABLE schedules (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    medicine_id INT NOT NULL,
-    dose_amount DECIMAL(10,2),
-    dose_unit VARCHAR(20),
-    frequency VARCHAR(50),
-    time_of_day TIME,
-    days_of_week VARCHAR(20),
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (medicine_id) REFERENCES medicines(id) ON DELETE CASCADE,
-    INDEX idx_user_id (user_id),
-    INDEX idx_medicine_id (medicine_id),
-    INDEX idx_is_active (is_active)
-);
-
--- Create medicine_recommendations table (from Gemini data)
+-- Create medicine_recommendations table 
 CREATE TABLE medicine_recommendations (
     id INT AUTO_INCREMENT PRIMARY KEY,
     medicine_name VARCHAR(200) NOT NULL,
@@ -146,7 +123,7 @@ CREATE TABLE medicine_recommendations (
     INDEX idx_medicine_name (medicine_name)
 );
 
--- Create dosage_optimization table (from Gemini data)
+-- Create dosage_optimization table 
 CREATE TABLE dosage_optimization (
     id INT AUTO_INCREMENT PRIMARY KEY,
     medicine_name VARCHAR(200) NOT NULL,

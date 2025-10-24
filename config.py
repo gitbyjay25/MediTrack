@@ -4,7 +4,7 @@
 DB_HOST = 'localhost'
 DB_USER = 'root' 
 DB_PASSWORD = 'Jay.@123'
-DB_NAME = 'TrackMedi'
+DB_NAME = 'trackmedi'
 
 # Flask settings
 SECRET_KEY = 'meditrek_secret_key_2024'

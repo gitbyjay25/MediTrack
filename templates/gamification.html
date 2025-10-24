@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}Gamification Dashboard - TrackMedi{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-purple-700 mb-4">
+            <i class="fas fa-trophy mr-3"></i>Gamification Dashboard
+        </h1>
+        <p class="text-xl text-gray-600">Track your progress and earn rewards!</p>
+    </div>
+
+    {% if stats %}
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Streak Card -->
+        <div class="bg-gradient-to-br from-orange-400 to-red-500 rounded-xl p-6 text-white shadow-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold">Current Streak</h3>
+                    <p class="text-3xl font-bold">{{ stats.streak_days }} days</p>
+                </div>
+                <i class="fas fa-fire text-4xl opacity-80"></i>
+            </div>
+        </div>
+
+        <!-- Points Card -->
+        <div class="bg-gradient-to-br from-blue-400 to-purple-500 rounded-xl p-6 text-white shadow-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold">Total Points</h3>
+                    <p class="text-3xl font-bold">{{ stats.total_points }}</p>
+                </div>
+                <i class="fas fa-star text-4xl opacity-80"></i>
+            </div>
+        </div>
+
+        <!-- Level Card -->
+        <div class="bg-gradient-to-br from-green-400 to-teal-500 rounded-xl p-6 text-white shadow-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold">Level</h3>
+                    <p class="text-3xl font-bold">{{ stats.level }}</p>
+                </div>
+                <i class="fas fa-medal text-4xl opacity-80"></i>
+            </div>
+        </div>
+
+        <!-- Longest Streak Card -->
+        <div class="bg-gradient-to-br from-pink-400 to-rose-500 rounded-xl p-6 text-white shadow-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold">Best Streak</h3>
+                    <p class="text-3xl font-bold">{{ stats.longest_streak }} days</p>
+                </div>
+                <i class="fas fa-crown text-4xl opacity-80"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    {% if stats.next_level_points %}
+    <div class="bg-white rounded-xl p-6 shadow-lg mb-8">
+        <h3 class="text-xl font-semibold text-gray-800 mb-4">Progress to Next Level</h3>
+        <div class="w-full bg-gray-200 rounded-full h-4">
+            <div class="bg-gradient-to-r from-purple-500 to-pink-500 h-4 rounded-full" 
+                 style="width: {{ (stats.total_points / stats.next_level_points * 100) | round(1) }}%"></div>
+        </div>
+        <p class="text-sm text-gray-600 mt-2">
+            {{ stats.total_points }} / {{ stats.next_level_points }} points 
+            ({{ (stats.total_points / stats.next_level_points * 100) | round(1) }}%)
+        </p>
+    </div>
+    {% endif %}
+
+    <!-- Badges Section -->
+    <div class="bg-white rounded-xl p-6 shadow-lg mb-8">
+        <h3 class="text-xl font-semibold text-gray-800 mb-6">
+            <i class="fas fa-award mr-2 text-yellow-500"></i>Earned Badges
+        </h3>
+        
+        {% if stats.earned_badges %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for badge in stats.earned_badges %}
+            <div class="bg-gradient-to-br from-yellow-100 to-orange-100 border border-yellow-300 rounded-lg p-4">
+                <div class="flex items-center">
+                    <i class="fas fa-medal text-2xl text-yellow-600 mr-3"></i>
+                    <div>
+                        <h4 class="font-semibold text-gray-800">{{ badge.name }}</h4>
+                        <p class="text-sm text-gray-600">{{ badge.description }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8">
+            <i class="fas fa-trophy text-6xl text-gray-300 mb-4"></i>
+            <p class="text-gray-500 text-lg">No badges earned yet. Keep taking your medicines to earn rewards!</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Available Badges -->
+    <div class="bg-white rounded-xl p-6 shadow-lg">
+        <h3 class="text-xl font-semibold text-gray-800 mb-6">
+            <i class="fas fa-target mr-2 text-blue-500"></i>Available Badges
+        </h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex items-center">
+                    <i class="fas fa-baby text-2xl text-blue-500 mr-3"></i>
+                    <div>
+                        <h4 class="font-semibold text-gray-800">First Step</h4>
+                        <p class="text-sm text-gray-600">Take your first medicine</p>
+                        <p class="text-xs text-green-600 font-semibold">+50 points</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex items-center">
+                    <i class="fas fa-calendar-week text-2xl text-orange-500 mr-3"></i>
+                    <div>
+                        <h4 class="font-semibold text-gray-800">Week Warrior</h4>
+                        <p class="text-sm text-gray-600">7-day streak</p>
+                        <p class="text-xs text-green-600 font-semibold">+100 points</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex items-center">
+                    <i class="fas fa-calendar-alt text-2xl text-purple-500 mr-3"></i>
+                    <div>
+                        <h4 class="font-semibold text-gray-800">Monthly Master</h4>
+                        <p class="text-sm text-gray-600">30-day streak</p>
+                        <p class="text-xs text-green-600 font-semibold">+300 points</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex items-center">
+                    <i class="fas fa-sun text-2xl text-yellow-500 mr-3"></i>
+                    <div>
+                        <h4 class="font-semibold text-gray-800">Early Bird</h4>
+                        <p class="text-sm text-gray-600">Take medicine before 8 AM</p>
+                        <p class="text-xs text-green-600 font-semibold">+75 points</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex items-center">
+                    <i class="fas fa-moon text-2xl text-indigo-500 mr-3"></i>
+                    <div>
+                        <h4 class="font-semibold text-gray-800">Night Owl</h4>
+                        <p class="text-sm text-gray-600">Take medicine after 10 PM</p>
+                        <p class="text-xs text-green-600 font-semibold">+75 points</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex items-center">
+                    <i class="fas fa-crown text-2xl text-red-500 mr-3"></i>
+                    <div>
+                        <h4 class="font-semibold text-gray-800">Level 10 Legend</h4>
+                        <p class="text-sm text-gray-600">Reach Level 10</p>
+                        <p class="text-xs text-green-600 font-semibold">+500 points</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- No Stats Available -->
+    <div class="text-center py-16">
+        <i class="fas fa-gamepad text-8xl text-gray-300 mb-6"></i>
+        <h2 class="text-2xl font-semibold text-gray-600 mb-4">Gamification Not Available</h2>
+        <p class="text-gray-500 text-lg">Start taking your medicines to see your progress!</p>
+        <a href="/dashboard" class="mt-6 inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Auto-refresh stats every 30 seconds
+setInterval(function() {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}

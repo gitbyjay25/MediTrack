@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrackMedi - Intelligent Medicine Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { font-family: 'Poppins', sans-serif; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-50 to-pink-50 min-h-screen">
+    <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md shadow-sm">
+        <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-pills text-3xl text-purple-600"></i>
+                <h1 class="text-2xl font-bold text-gray-800">TrackMedi</h1>
+            </div>
+            <div class="flex space-x-6">
+                <a href="/" class="text-gray-600 hover:text-purple-600 transition-colors">Home</a>
+                <a href="#features" class="text-gray-600 hover:text-purple-600 transition-colors">Features</a>
+                <a href="#about" class="text-gray-600 hover:text-purple-600 transition-colors">About</a>
+                {% if session.get('user_id') %}
+                <a href="/dashboard" class="text-gray-600 hover:text-purple-600 transition-colors">Dashboard</a>
+                <a href="/logout" class="text-gray-600 hover:text-purple-600 transition-colors">Logout</a>
+                {% else %}
+                <a href="/login" class="text-gray-600 hover:text-purple-600 transition-colors">Login</a>
+                <a href="/register" class="text-gray-600 hover:text-purple-600 transition-colors">Register</a>
+                {% endif %}
+            </div>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section id="home" class="py-20 bg-gradient-to-br from-purple-100 to-pink-100">
+        <div class="container mx-auto px-4">
+            <div class="max-w-4xl mx-auto text-center">
+                <h1 class="text-5xl font-extrabold text-purple-700 mb-4 tracking-tight">TrackMedi</h1>
+                <p class="text-2xl text-purple-600 font-semibold mb-2">Intelligent Medicine Management System</p>
+                <p class="text-xl text-gray-600 mb-8">Revolutionizing Healthcare with AI-Powered Medicine Tracking & Recommendations</p>
+                <div class="flex flex-col items-center space-y-4">
+                    {% if session.get('user_id') %}
+                    <a href="/dashboard" class="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all transform hover:-translate-y-0.5 text-xl font-semibold shadow-lg mt-4 inline-block">
+                        <i class="fas fa-tachometer-alt mr-2"></i>Go to Dashboard
+                    </a>
+                    {% else %}
+                    <div class="flex justify-center space-x-4">
+                        <a href="/login" class="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all transform hover:-translate-y-0.5">
+                            <i class="fas fa-sign-in-alt mr-2"></i>Login
+                        </a>
+                        <a href="/register" class="px-8 py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg hover:from-pink-600 hover:to-rose-600 transition-all transform hover:-translate-y-0.5">
+                            <i class="fas fa-user-plus mr-2"></i>Register
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-20 bg-white">
+        <div class="container mx-auto px-4">
+            <div class="max-w-6xl mx-auto">
+                <h2 class="text-3xl font-bold text-gray-800 mb-12 text-center">Key Features</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                        <div class="text-center">
+                            <i class="fas fa-brain text-4xl text-purple-600 mb-4"></i>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-4">AI Drug Interaction Detection</h3>
+                            <p class="text-gray-600">Advanced ML models predict potential drug interactions with 97.4% accuracy</p>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                        <div class="text-center">
+                            <i class="fas fa-pills text-4xl text-pink-600 mb-4"></i>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-4">Smart Medicine Recommendations</h3>
+                            <p class="text-gray-600">Personalized medicine suggestions based on your health conditions</p>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                        <div class="text-center">
+                            <i class="fas fa-chart-line text-4xl text-purple-600 mb-4"></i>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-4">Dosage Optimization</h3>
+                            <p class="text-gray-600">AI-powered dosage recommendations for optimal treatment outcomes</p>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                        <div class="text-center">
+                            <i class="fas fa-database text-4xl text-pink-600 mb-4"></i>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-4">Real Medicine Database</h3>
+                            <p class="text-gray-600">Comprehensive database with 231+ WHO essential medicines</p>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                        <div class="text-center">
+                            <i class="fas fa-bell text-4xl text-purple-600 mb-4"></i>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-4">Smart Reminders</h3>
+                            <p class="text-gray-600">Intelligent medication reminders and adherence tracking</p>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                        <div class="text-center">
+                            <i class="fas fa-shield-alt text-4xl text-pink-600 mb-4"></i>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-4">Safety First</h3>
+                            <p class="text-gray-600">Comprehensive safety checks and interaction warnings</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="py-20 bg-gradient-to-br from-purple-100 to-pink-100">
+        <div class="container mx-auto px-4">
+            <div class="max-w-4xl mx-auto">
+                <h2 class="text-3xl font-bold text-gray-800 mb-8 text-center">About TrackMedi</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-md">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">What is TrackMedi?</h3>
+                        <p class="text-gray-600">TrackMedi is an intelligent medicine management system that combines DBMS, Machine Learning, and Operating System concepts to provide comprehensive healthcare solutions. Our system helps users manage medications safely and effectively.</p>
+                    </div>
+                    <div class="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-md">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">Technology Stack</h3>
+                        <ul class="space-y-2 text-gray-600">
+                            <li><i class="fas fa-check-circle text-purple-500 mr-2"></i>MySQL Database Management</li>
+                            <li><i class="fas fa-check-circle text-purple-500 mr-2"></i>Flask Backend API</li>
+                            <li><i class="fas fa-check-circle text-purple-500 mr-2"></i>Machine Learning Models</li>
+                            <li><i class="fas fa-check-circle text-purple-500 mr-2"></i>Real-time Drug Interaction Detection</li>
+                            <li><i class="fas fa-check-circle text-purple-500 mr-2"></i>Smart Medicine Recommendations</li>
+                            <li><i class="fas fa-check-circle text-purple-500 mr-2"></i>Modern Web Interface</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-8">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-lg font-semibold">TrackMedi - Intelligent Medicine Management</p>
+            <p class="text-sm opacity-80">Powered by AI • Built with ❤️</p>
+        </div>
+    </footer>
+</body>
+</html>

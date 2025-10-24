@@ -1,53 +1,131 @@
 {% extends "base.html" %}
 
-{% block title %}Medicine Recommendations - MediTrek{% endblock %}
+{% block title %}Medicine Recommendations - TrackMedi{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Medicine Recommendations</h2>
-    <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
-</div>
-
-<div class="card">
-    <div class="card-header">
-        <h4>Medicine Recommendations</h4>
-    </div>
-    <div class="card-body">
-        {% if recommendations %}
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Medical Condition</th>
-                            <th>Medicine</th>
-                            <th>Recommendation</th>
-                            <th>Confidence</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for rec in recommendations %}
-                        <tr>
-                            <td class="fw-bold">{{ rec.medical_condition or 'General' }}</td>
-                            <td>{{ rec.medicine_name }}</td>
-                            <td>{{ rec.recommendation_text }}</td>
-                            <td>
-                                <span class="badge bg-{% if rec.confidence_score >= 0.8 %}success{% elif rec.confidence_score >= 0.6 %}warning{% else %}secondary{% endif %}">
-                                    {{ "%.0f"|format(rec.confidence_score * 100) }}%
-                                </span>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+<div class="max-w-7xl mx-auto">
+    <!-- Header Section -->
+    <div class="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-8 rounded-2xl shadow-lg mb-8">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold mb-2">Medicine Recommendations</h1>
+                <p class="text-purple-100">AI-powered medicine suggestions based on your profile</p>
             </div>
-        {% else %}
-            <p class="text-muted">No recommendations available.</p>
-        {% endif %}
+            <div class="text-right">
+                <div class="bg-white/20 backdrop-blur-sm rounded-lg p-4">
+                    <i class="fas fa-brain text-4xl mb-2 block"></i>
+                    <p class="text-sm">ML Powered</p>
+                    <p class="text-2xl font-bold">{{ recommendations|length if recommendations else 0 }}</p>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
 
-<div class="alert alert-info mt-4">
-    <strong>Disclaimer:</strong> These recommendations are for informational purposes only. 
-    Always consult your healthcare provider before taking any medication.
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Main Content -->
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">Smart Recommendations</h2>
+                    <a href="/dashboard" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all transform hover:-translate-y-0.5 shadow-lg">
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                    </a>
+                </div>
+                
+                {% if recommendations %}
+                    <div class="space-y-4">
+                        {% for rec in recommendations %}
+                        <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-100 hover:shadow-md transition-all">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center mb-2">
+                                        <i class="fas fa-pills text-purple-500 mr-3"></i>
+                                        <h3 class="text-lg font-semibold text-gray-800">{{ rec.medicine_name }}</h3>
+                                    </div>
+                                    
+                                    {% if rec.primary_conditions %}
+                                    <div class="mb-2">
+                                        <span class="text-sm font-medium text-gray-600">Primary Use:</span>
+                                        <span class="text-sm text-gray-700 ml-2">{{ rec.primary_conditions[:100] }}{% if rec.primary_conditions|length > 100 %}...{% endif %}</span>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if rec.secondary_conditions %}
+                                    <div class="mb-2">
+                                        <span class="text-sm font-medium text-gray-600">Secondary Use:</span>
+                                        <span class="text-sm text-gray-700 ml-2">{{ rec.secondary_conditions[:100] }}{% if rec.secondary_conditions|length > 100 %}...{% endif %}</span>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if rec.contraindications %}
+                                    <div class="mb-2">
+                                        <span class="text-sm font-medium text-red-600">⚠️ Contraindications:</span>
+                                        <span class="text-sm text-red-700 ml-2">{{ rec.contraindications[:100] }}{% if rec.contraindications|length > 100 %}...{% endif %}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="ml-4 text-right">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                        <i class="fas fa-check-circle mr-1"></i>
+                                        Recommended
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-12">
+                        <i class="fas fa-lightbulb text-6xl text-gray-300 mb-4"></i>
+                        <h3 class="text-xl font-semibold text-gray-600 mb-2">No Recommendations Available</h3>
+                        <p class="text-gray-500 mb-6">Add some medicines to get personalized recommendations</p>
+                        <a href="/add_medicine" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all transform hover:-translate-y-0.5 shadow-lg">
+                            <i class="fas fa-plus mr-2"></i>Add Medicine
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- AI Info Card -->
+            <div class="bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl shadow-lg p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">
+                    <i class="fas fa-robot mr-2 text-purple-600"></i>AI Recommendations
+                </h3>
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        <i class="fas fa-brain text-purple-500 mr-3"></i>
+                        <span class="text-sm text-gray-600">Random Forest Classifier</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-database text-purple-500 mr-3"></i>
+                        <span class="text-sm text-gray-600">WHO Medicine Database</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-user-md text-purple-500 mr-3"></i>
+                        <span class="text-sm text-gray-600">Personalized Suggestions</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-trophy text-purple-500 mr-3"></i>
+                        <span class="text-sm text-gray-600">95.9% Accuracy</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Disclaimer Card -->
+            <div class="bg-gradient-to-br from-yellow-100 to-orange-100 rounded-xl shadow-lg p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">
+                    <i class="fas fa-exclamation-triangle mr-2 text-yellow-600"></i>Important Notice
+                </h3>
+                <p class="text-sm text-gray-700">
+                    These recommendations are generated by AI and are for informational purposes only. 
+                    Always consult your healthcare provider before taking any medication.
+                </p>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

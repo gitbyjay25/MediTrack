@@ -3,7 +3,7 @@
 # Database settings
 DB_HOST = 'localhost'
 DB_USER = 'root' 
-DB_PASSWORD = 'Jay.@123'
+DB_PASSWORD = '#########'
 DB_NAME = 'trackmedi'
 
 # Flask settings

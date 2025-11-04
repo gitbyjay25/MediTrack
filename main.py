@@ -3,63 +3,49 @@ import os
 import bcrypt
 from database.db_config import execute_query
 from backend.ml.drug_interactions import check_drug_interaction
+from werkzeug.utils import secure_filename
+from werkzeug.exceptions import RequestEntityTooLarge
 
 def generate_timing_advice(drug1, drug2, severity, description):
-    """Generate dynamic timing advice based on interaction risk analysis"""
+    description_lower = description.lower()
     
-    # Risk analysis based on description keywords
-    def analyze_interaction_risk(description):
-        description_lower = description.lower()
-        
-        # High risk keywords
-        high_risk_keywords = [
-            'bleeding', 'hemorrhage', 'death', 'fatal', 'life-threatening', 
-            'cardiac arrest', 'heart failure', 'severe', 'critical', 'emergency',
-            'overdose', 'toxicity', 'kidney failure', 'liver damage', 'stroke'
-        ]
-        
-        # Medium risk keywords  
-        medium_risk_keywords = [
-            'increase', 'decrease', 'reduce', 'enhance', 'potentiate', 'inhibit',
-            'metabolism', 'absorption', 'excretion', 'side effects', 'adverse',
-            'monitor', 'caution', 'warning', 'risk', 'interaction'
-        ]
-        
-        # Count risk indicators
-        high_risk_count = sum(1 for keyword in high_risk_keywords if keyword in description_lower)
-        medium_risk_count = sum(1 for keyword in medium_risk_keywords if keyword in description_lower)
-        
-        return high_risk_count, medium_risk_count
+    high_risk_keywords = [
+        'bleeding', 'hemorrhage', 'death', 'fatal', 'life-threatening', 
+        'cardiac arrest', 'heart failure', 'severe', 'critical', 'emergency',
+        'overdose', 'toxicity', 'kidney failure', 'liver damage', 'stroke'
+    ]
     
-    # Analyze the interaction risk
-    high_risk_count, medium_risk_count = analyze_interaction_risk(description)
+    medium_risk_keywords = [
+        'increase', 'decrease', 'reduce', 'enhance', 'potentiate', 'inhibit',
+        'metabolism', 'absorption', 'excretion', 'side effects', 'adverse',
+        'monitor', 'caution', 'warning', 'risk', 'interaction'
+    ]
     
-    # Determine timing based on severity + risk analysis
+    high_risk_count = sum(1 for keyword in high_risk_keywords if keyword in description_lower)
+    medium_risk_count = sum(1 for keyword in medium_risk_keywords if keyword in description_lower)
+    
     severity_lower = severity.lower()
     
-    # High severity or high risk keywords = longer spacing
     if severity_lower == 'high' or high_risk_count >= 2:
-        if high_risk_count >= 3:  # Very dangerous
+        if high_risk_count >= 3:
             return f"⚠️ CRITICAL: Take {drug1} at least 2-3 hours before or after {drug2} (Very dangerous interaction!)"
-        else:  # High severity
+        else:
             return f"⚠️ CRITICAL: Take {drug1} at least 1-2 hours before or after {drug2} (Dangerous interaction!)"
     
-    # Medium severity or medium risk keywords = moderate spacing
     elif severity_lower == 'medium' or medium_risk_count >= 2:
-        if medium_risk_count >= 3:  # High medium risk
+        if medium_risk_count >= 3:
             return f"⏰ Take {drug1} at least 60-90 minutes before or after {drug2} (Moderate-high risk)"
-        else:  # Normal medium risk
+        else:
             return f"⏰ Take {drug1} at least 40-60 minutes before or after {drug2} (Moderate risk)"
     
-    # Low severity = minimal spacing
     else:
-        if medium_risk_count >= 1:  # Some risk detected
+        if medium_risk_count >= 1:
             return f"⏰ Take {drug1} at least 30-45 minutes before or after {drug2} (Low-moderate risk)"
-        else:  # Very low risk
+        else:
             return f"⏰ Take {drug1} at least 15-20 minutes before or after {drug2} (Low risk)"
+
 from datetime import datetime
 
-# ML Services (with fallback for development without models)
 try:
     from ml_recommendation_service import RecommendationEngine
     recommendation_engine = RecommendationEngine()
@@ -69,7 +55,6 @@ except ImportError:
     ML_RECOMMENDATION_ENABLED = False
     recommendation_engine = None
 
-# Gamification Engine
 try:
     from gamification_engine import gamification_engine
     GAMIFICATION_ENABLED = True
@@ -78,7 +63,6 @@ except ImportError:
     GAMIFICATION_ENABLED = False
     gamification_engine = None
 
-# Analytics Engine
 try:
     from analytics_engine import analytics_engine
     ANALYTICS_ENABLED = True
@@ -106,10 +90,28 @@ except ImportError:
     dosage_optimization_engine = None
 
 app = Flask(__name__)
+
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.errorhandler(413)
+def too_large(e):
+    # Return JSON for large uploads
+    return jsonify({'success': False, 'error': 'File too large. Max 5MB allowed.'}), 413
+
 @app.route('/assets/<path:filename>')
 def serve_asset(filename):
     base_dir = os.path.join(os.path.dirname(__file__), 'database', 'data')
     return send_from_directory(base_dir, filename)
+
 app.secret_key = 'meditrek_secret_key_2024'
 
 @app.route('/')
@@ -121,7 +123,6 @@ def login():
     if request.method == 'GET':
         return render_template('login.html')
     
-    # POST method (existing login logic)
     email = request.form['email']
     password = request.form['password']
     
@@ -177,7 +178,6 @@ def dashboard():
     
     user_id = session['user_id']
     
-    # Get user's personal medicines with dose tracking
     query = """
         SELECT um.*, m.form, m.main_category,
                CASE 
@@ -192,7 +192,6 @@ def dashboard():
     """
     medicines = execute_query(query, (user_id,))
     
-    # Check for drug interactions
     interactions = []
     if medicines:
         medicine_names = [med['medicine_name'] for med in medicines]
@@ -200,7 +199,6 @@ def dashboard():
             for med2 in medicine_names[i+1:]:
                 interaction = check_drug_interaction(med1, med2)
                 if interaction:
-                    # Generate timing advice based on severity and interaction type
                     timing_advice = generate_timing_advice(med1, med2, interaction['severity'], interaction['description'])
                     interactions.append({
                         'drug1': med1,
@@ -211,7 +209,6 @@ def dashboard():
                         'timing_advice': timing_advice
                     })
     
-    # Get user stats
     stats_query = """
         SELECT 
             COUNT(*) as total_medicines,
@@ -222,7 +219,6 @@ def dashboard():
     """
     stats = execute_query(stats_query, (user_id,))
     
-    # Get ML model status
     ml_status = {
         'recommendation': ML_RECOMMENDATION_ENABLED,
         'interaction': ML_INTERACTION_ENABLED,
@@ -251,6 +247,94 @@ def search_medicine():
     
     return jsonify([])
 
+@app.route('/upload_prescription', methods=['POST'])
+def upload_prescription():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Not logged in'})
+    
+    try:
+        if 'prescription' not in request.files:
+            return jsonify({'success': False, 'error': 'No file uploaded'})
+        
+        file = request.files['prescription']
+        
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'})
+        
+        if not allowed_file(file.filename):
+            return jsonify({'success': False, 'error': 'Invalid file type'})
+        
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        
+        try:
+            # Use built-in OCR service (EasyOCR-based)
+            from PIL import Image
+            from ocr_service import extract_prescription_data, is_ocr_available
+
+            if not is_ocr_available():
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                return jsonify({'success': False, 'error': 'OCR engine not available on server'})
+
+            # Open and downscale very large images to avoid OCR timeouts/crashes
+            with Image.open(filepath) as img:
+                try:
+                    img.load()
+                except Exception as e:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                    return jsonify({'success': False, 'error': f'Invalid image: {str(e)}'})
+
+                # Normalize mode
+                if img.mode not in ('RGB', 'L'):
+                    img = img.convert('RGB')
+
+                max_dim = 1800
+                w, h = img.size
+                if max(w, h) > max_dim:
+                    # Preserve aspect ratio
+                    ratio = max_dim / float(max(w, h))
+                    new_size = (max(1, int(w * ratio)), max(1, int(h * ratio)))
+                    try:
+                        img = img.resize(new_size, Image.LANCZOS)
+                    except Exception:
+                        img.thumbnail((max_dim, max_dim))
+
+                result = extract_prescription_data(img)
+
+            if os.path.exists(filepath):
+                os.remove(filepath)
+
+            if not result.get('success'):
+                return jsonify({'success': False, 'error': result.get('error', 'OCR failed')})
+
+            # Normalize keys expected by frontend
+            data = result.get('data') or {}
+            details = {
+                'med_name': data.get('med_name'),
+                'dosage': data.get('dosage'),
+                'frequency': data.get('frequency'),
+                'age_group': data.get('age_group'),
+                'age': data.get('age'),
+                'weight': data.get('weight'),
+                'height': data.get('height'),
+                'allergies': data.get('allergies'),
+                'gender': data.get('gender'),
+                'purpose': data.get('purpose'),
+                'raw_text': result.get('raw_text')
+            }
+
+            return jsonify({'success': True, 'details': details})
+        except Exception as e:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            return jsonify({'success': False, 'error': f'OCR failed: {str(e)}'})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @app.route('/add_medicine', methods=['POST'])
 def add_medicine():
     if 'user_id' not in session:
@@ -268,21 +352,17 @@ def add_medicine():
     medical_conditions = request.form.get('medical_conditions', '')
     allergies = request.form.get('allergies', '')
     
-    # Get reminder times
     reminder_times = []
     for key, value in request.form.items():
         if key.startswith('reminder_time_') and value:
             reminder_times.append(value)
     
-    # Convert reminder times to JSON string
     reminder_times_json = ','.join(reminder_times) if reminder_times else ''
     
-    # Basic validation for required fields
     if not med_name or not dosage or not frequency or not age_group:
         flash('Please fill in all required fields: Medicine Name, Dosage, Frequency, and Age Group.', 'error')
         return redirect(url_for('add_medicine_form'))
     
-    # Check if medicine exists in reference database
     query = "SELECT * FROM medicines WHERE medicine_name LIKE %s LIMIT 1"
     med_result = execute_query(query, (f'%{med_name}%',))
     
@@ -290,7 +370,6 @@ def add_medicine():
         flash('Medicine not found in database')
         return redirect(url_for('add_medicine_form'))
     
-    # Check if user already has this medicine
     check_query = "SELECT id FROM user_medicines WHERE user_id = %s AND medicine_name = %s AND status = 'active'"
     existing = execute_query(check_query, (user_id, med_name))
     
@@ -298,7 +377,6 @@ def add_medicine():
         flash('Medicine already added to your list')
         return redirect(url_for('add_medicine_form'))
     
-    # Check for drug interactions with existing medicines
     existing_meds_query = "SELECT medicine_name FROM user_medicines WHERE user_id = %s AND status = 'active'"
     existing_meds = execute_query(existing_meds_query, (user_id,))
     
@@ -306,20 +384,17 @@ def add_medicine():
     if existing_meds:
         try:
             from ml_interaction_service import interaction_engine
-            # Use ML-powered interaction checking
             for existing_med in existing_meds:
                 interaction = interaction_engine.predict_interaction_severity(med_name, existing_med['medicine_name'])
                 if interaction:
                     interactions.append(interaction)
         except ImportError:
-            # Fallback to database lookup
             existing_med_names = [med['medicine_name'] for med in existing_meds]
             for existing_med in existing_med_names:
                 interaction_check = check_drug_interaction(med_name, existing_med)
                 if interaction_check:
                     interactions.append(interaction_check)
     
-    # Add to user's medicine list
     insert_query = """
         INSERT INTO user_medicines (user_id, medicine_name, dosage, frequency, age_group, weight, height, gender, purpose, medical_conditions, allergies, adherence_score, reminder_times, reminder_enabled)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 100, %s, TRUE)
@@ -329,7 +404,6 @@ def add_medicine():
     if med_id:
         flash('Medicine added successfully!')
         
-        # Show interactions if any
         if interactions:
             for interaction in interactions:
                 flash(f'⚠️ Drug Interaction Alert: {interaction["description"]}', 'warning')
@@ -346,12 +420,10 @@ def recommendations():
     
     user_id = session['user_id']
     
-    # Import ML recommendation engine
     try:
         from ml_recommendation_service import recommendation_engine
         recommendations = recommendation_engine.get_smart_recommendations(user_id)
     except ImportError:
-        # Fallback to database lookup
         query = "SELECT * FROM medicine_recommendations ORDER BY medicine_name LIMIT 10"
         recommendations = execute_query(query)
     
@@ -371,12 +443,10 @@ def dosage_optimization():
     
     user_id = session['user_id']
     
-    # Import ML dosage engine
     try:
         from ml_dosage_service import dosage_engine
         recommendations = dosage_engine.get_dosage_recommendations(user_id)
     except ImportError:
-        # Fallback to database lookup
         recommendations = []
     
     return render_template('dosage_optimization.html', recommendations=recommendations)
@@ -390,7 +460,6 @@ def take_medicine():
         user_id = session['user_id']
         medicine_id = request.json.get('medicine_id')
         
-        # Get current medicine data
         med_query = "SELECT * FROM user_medicines WHERE id = %s AND user_id = %s"
         medicine = execute_query(med_query, (medicine_id, user_id))
         
@@ -401,10 +470,8 @@ def take_medicine():
         current_doses = medicine.get('daily_doses_taken', 0)
         total_required = medicine.get('total_doses_required', 1)
         
-        # Increment daily doses taken
         new_doses = min(current_doses + 1, total_required)
         
-        # Update medicine with dose tracking
         query = """
             UPDATE user_medicines 
             SET daily_doses_taken = %s,
@@ -415,14 +482,12 @@ def take_medicine():
         """
         execute_query(query, (new_doses, medicine_id, user_id))
         
-        # Gamification: Award points and update streak
         points = 0
         if GAMIFICATION_ENABLED and gamification_engine:
             points = gamification_engine.calculate_points(user_id, medicine_id, dose_taken=True, on_time=True)
             gamification_engine.add_points(user_id, points)
             new_streak = gamification_engine.update_streak(user_id)
             
-            # Check for badges
             if new_streak == 1:
                 gamification_engine.award_badge(user_id, 'first_dose')
             elif new_streak == 7:
@@ -430,7 +495,6 @@ def take_medicine():
             elif new_streak == 30:
                 gamification_engine.award_badge(user_id, 'month_streak')
         
-        # Check if all doses taken for today
         is_complete = new_doses >= total_required
         
         return jsonify({
@@ -452,7 +516,6 @@ def miss_medicine():
         user_id = session['user_id']
         medicine_id = request.json.get('medicine_id')
         
-        # Update adherence score for missed dose
         query = """
             UPDATE user_medicines 
             SET adherence_score = GREATEST(adherence_score - 10, 0)
@@ -476,7 +539,6 @@ def remove_medicine():
         if not medicine_id:
             return jsonify({'success': False, 'error': 'Medicine ID required'})
         
-        # Update medicine status to '0' instead of deleting
         query = """
             UPDATE user_medicines 
             SET status = '0'

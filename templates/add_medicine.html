@@ -17,6 +17,20 @@
 
     <!-- Form -->
     <div class="bg-white rounded-xl shadow-lg p-8">
+        <div class="mb-6 p-4 rounded-lg border border-dashed border-purple-400 bg-purple-50">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas fa-file-medical text-purple-600 mr-2"></i>
+                    <span class="font-medium text-purple-900">Upload Prescription (OCR)</span>
+                </div>
+                <div>
+                    <input id="prescription_input_add" type="file" accept="image/*" style="display:none" onchange="handlePrescriptionUploadOnAdd(event)">
+                    <button type="button" onclick="document.getElementById('prescription_input_add').click()" class="px-3 py-2 rounded bg-purple-600 text-white hover:bg-purple-700 text-sm">Choose Image</button>
+                </div>
+            </div>
+            <div id="prescription_status_add" class="text-xs text-purple-700 mt-2" style="display:none"></div>
+        </div>
+
         <form method="POST" action="/add_medicine" class="space-y-6">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -321,6 +335,136 @@ function addReminderTimeWithValue(timeValue) {
         </button>
     `;
     reminderTimes.appendChild(newReminder);
+}
+</script>
+<script>
+// Prefill form from URL parameters (used after OCR)
+document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+    const setIf = (selector, val) => { if (val) { const el = document.querySelector(selector); if (el) el.value = val; } };
+
+    setIf('#med_name', params.get('med_name'));
+    setIf('input[name="dosage"]', params.get('dosage'));
+
+    const frequency = params.get('frequency');
+    if (frequency) {
+        const selects = document.querySelectorAll('select[name="frequency"]');
+        selects.forEach(sel => { sel.value = frequency; sel.dispatchEvent(new Event('change')); });
+    }
+
+    const ageGroup = params.get('age_group');
+    if (ageGroup) {
+        const ageSel = document.querySelector('select[name="age_group"]');
+        if (ageSel) ageSel.value = ageGroup;
+    }
+
+    setIf('input[name="weight"]', params.get('weight'));
+    setIf('input[name="height"]', params.get('height'));
+    setIf('textarea[name="allergies"]', params.get('allergies'));
+    setIf('textarea[name="purpose"]', params.get('purpose'));
+    const gender = params.get('gender');
+    if (gender) {
+        const gSel = document.querySelector('select[name="gender"]');
+        if (gSel) gSel.value = gender.toLowerCase();
+    }
+});
+
+// Direct OCR upload on Add Medicine page (fills fields without redirect)
+function handlePrescriptionUploadOnAdd(evt) {
+    const file = evt.target.files && evt.target.files[0];
+    if (!file) return;
+    const statusEl = document.getElementById('prescription_status_add');
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Uploading and reading prescription...';
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort('timeout'), 30000);
+
+    const prepareImageBlob = (f) => new Promise((resolve) => {
+        try {
+            const url = URL.createObjectURL(f);
+            const img = new Image();
+            img.onload = () => {
+                try {
+                    const maxDim = 1600;
+                    let w = img.naturalWidth || img.width;
+                    let h = img.naturalHeight || img.height;
+                    if (Math.max(w, h) > maxDim) {
+                        const ratio = maxDim / Math.max(w, h);
+                        w = Math.max(1, Math.floor(w * ratio));
+                        h = Math.max(1, Math.floor(h * ratio));
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    canvas.toBlob((blob) => {
+                        URL.revokeObjectURL(url);
+                        resolve(blob || f);
+                    }, 'image/jpeg', 0.85);
+                } catch(_) {
+                    URL.revokeObjectURL(url);
+                    resolve(f);
+                }
+            };
+            img.onerror = () => { URL.revokeObjectURL(url); resolve(f); };
+            img.src = url;
+        } catch(_) { resolve(f); }
+    });
+
+    prepareImageBlob(file).then((blob) => {
+        const formData = new FormData();
+        const uploadFile = (blob instanceof Blob) ? new File([blob], (file.name || 'prescription') + '.jpg') : file;
+        formData.append('prescription', uploadFile);
+
+        return fetch('/upload_prescription', { method: 'POST', body: formData, signal: controller.signal, cache: 'no-store' })
+            .then(async r => {
+                const raw = await r.text();
+                let json;
+                try { json = JSON.parse(raw); } catch (_) {
+                    const snippet = raw ? raw.slice(0, 200) : '(no body)';
+                    throw new Error(`HTTP ${r.status} ${r.statusText} - ${snippet}`);
+                }
+                if (!r.ok) throw new Error(json.error || `HTTP ${r.status}`);
+                return json;
+            });
+    })
+    .then(res => {
+        if (!res.success) throw new Error(res.error || 'OCR failed');
+        const d = res.details || {};
+
+        const setIf = (selector, val) => { if (val) { const el = document.querySelector(selector); if (el) el.value = val; } };
+        setIf('#med_name', d.med_name);
+        setIf('input[name="dosage"]', d.dosage);
+
+        if (d.frequency) {
+            const selects = document.querySelectorAll('select[name="frequency"]');
+            selects.forEach(sel => { sel.value = d.frequency; sel.dispatchEvent(new Event('change')); });
+        }
+        if (d.age_group) {
+            const ageSel = document.querySelector('select[name="age_group"]');
+            if (ageSel) ageSel.value = d.age_group;
+        }
+        setIf('input[name="weight"]', d.weight);
+        setIf('input[name="height"]', d.height);
+        setIf('textarea[name="allergies"]', d.allergies);
+        setIf('textarea[name="purpose"]', d.purpose);
+        if (d.gender) {
+            const gSel = document.querySelector('select[name="gender"]');
+            if (gSel) gSel.value = (d.gender || '').toLowerCase();
+        }
+
+        statusEl.textContent = '✅ Prescription details filled. Please verify and submit.';
+    })
+    .catch(err => {
+        console.error(err);
+        const msg = (err && err.name === 'AbortError') ? 'Request timed out. Please try a smaller image.' : (err.message || 'failed to read prescription');
+        statusEl.textContent = 'Error: ' + msg;
+        alert('OCR error: ' + msg);
+    })
+    .finally(() => {
+        try { clearTimeout(timeoutId); } catch(_) {}
+    });
 }
 </script>
 {% endblock %}

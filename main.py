@@ -40,26 +40,68 @@ def generate_timing_advice(drug1, drug2, severity, description):
     # High severity or high risk keywords = longer spacing
     if severity_lower == 'high' or high_risk_count >= 2:
         if high_risk_count >= 3:  # Very dangerous
-            return f"⚠️ CRITICAL: Take {drug1} at least 2-3 hours before or after {drug2} (Very dangerous interaction!)"
+            return f" CRITICAL: Take {drug1} at least 2-3 hours before or after {drug2} (Very dangerous interaction!)"
         else:  # High severity
-            return f"⚠️ CRITICAL: Take {drug1} at least 1-2 hours before or after {drug2} (Dangerous interaction!)"
+            return f"CRITICAL: Take {drug1} at least 1-2 hours before or after {drug2} (Dangerous interaction!)"
     
     # Medium severity or medium risk keywords = moderate spacing
     elif severity_lower == 'medium' or medium_risk_count >= 2:
         if medium_risk_count >= 3:  # High medium risk
-            return f"⏰ Take {drug1} at least 60-90 minutes before or after {drug2} (Moderate-high risk)"
+            return f" Take {drug1} at least 60-90 minutes before or after {drug2} (Moderate-high risk)"
         else:  # Normal medium risk
-            return f"⏰ Take {drug1} at least 40-60 minutes before or after {drug2} (Moderate risk)"
+            return f" Take {drug1} at least 40-60 minutes before or after {drug2} (Moderate risk)"
     
     # Low severity = minimal spacing
     else:
         if medium_risk_count >= 1:  # Some risk detected
-            return f"⏰ Take {drug1} at least 30-45 minutes before or after {drug2} (Low-moderate risk)"
+            return f"Take {drug1} at least 30-45 minutes before or after {drug2} (Low-moderate risk)"
         else:  # Very low risk
-            return f"⏰ Take {drug1} at least 15-20 minutes before or after {drug2} (Low risk)"
+            return f"Take {drug1} at least 15-20 minutes before or after {drug2} (Low risk)"
 from datetime import datetime
+import io
+import re
+from typing import Dict, Optional
 
-# ML Services (with fallback for development without models)
+try:
+    from PIL import Image
+    import pytesseract
+    OCR_AVAILABLE = True
+except Exception:
+    OCR_AVAILABLE = False
+
+# Import OCR service for prescription extraction
+try:
+    from ocr_service import extract_prescription_data, is_ocr_available
+    OCR_SERVICE_AVAILABLE = True
+except ImportError:
+    OCR_SERVICE_AVAILABLE = False
+    def is_ocr_available():
+        return False
+    def extract_prescription_data(image):
+        return {'success': False, 'error': 'OCR service not available'}
+
+# Optional: PaddleOCR (excellent for handwritten text, pretrained models)
+PADDLEOCR_AVAILABLE = False
+_paddleocr_reader = None
+try:
+    from paddleocr import PaddleOCR  # type: ignore
+    PADDLEOCR_AVAILABLE = True
+except Exception as e:
+    print(f"PaddleOCR not available: {e}")
+    PADDLEOCR_AVAILABLE = False
+
+# Optional: TrOCR (Transformer-based OCR, best for handwritten text)
+TROCR_AVAILABLE = False
+_trocr_processor = None
+_trocr_model = None
+try:
+    from transformers import TrOCRProcessor, VisionEncoderDecoderModel  # type: ignore
+    TROCR_AVAILABLE = True
+except Exception as e:
+    print(f"TrOCR not available: {e}")
+    TROCR_AVAILABLE = False
+
+# ML Services 
 try:
     from ml_recommendation_service import RecommendationEngine
     recommendation_engine = RecommendationEngine()
@@ -339,6 +381,309 @@ def add_medicine():
         flash('Failed to add medicine')
         return redirect(url_for('add_medicine_form'))
 
+# Moved to ocr_service.py - keeping for backward compatibility if needed
+def _parse_prescription_text(text: str) -> Dict[str, Optional[str]]:
+    """Extract medicine name, dosage and frequency heuristically from OCR text."""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    
+    # Enhanced dosage patterns - handle more formats
+    dosage_pattern = re.compile(
+        r"\b((\d+(?:\.\d+)?)\s*(mg|mcg|g|ml|iu|units|tablet|tab|capsule|cap|drop|drops|tsp|teaspoon))|"
+        r"((\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)\s*(mg|ml))|"
+        r"((\d+(?:\.\d+)?)\s*%\s*(w/w|w/v|cream|ointment))\b",
+        re.IGNORECASE
+    )
+    
+    # Enhanced frequency map with more variations
+    freq_map = {
+        'once daily': ['od', 'once daily', 'qd', 'daily', 'q.d.', 'q24h', 'q 24h', 'once a day', '1x daily'],
+        'twice daily': ['bd', 'twice daily', 'bid', 'b.i.d', 'b.i.d.', 'q12h', 'q 12h', '2x daily', 'twice a day'],
+        'three times daily': ['tid', 't.d.s', 'tds', 't.i.d', 't.i.d.', 'three times', '3x daily', 'thrice daily'],
+        'four times daily': ['qid', 'q.i.d', 'q.i.d.', 'q6h', 'q 6h', '4x daily', 'four times'],
+        'every 8 hours': ['q8h', 'q 8h', 'every 8 hours', 'every 8 hrs', 'every eight hours'],
+        'every 12 hours': ['q12h', 'q 12h', 'every 12 hours', 'every 12 hrs', 'every twelve hours'],
+        'at bedtime': ['hs', 'qhs', 'at bedtime', 'bedtime', 'night', 'nightly'],
+        'as needed': ['sos', 'prn', 'p.r.n', 'as needed', 'when required', 'as directed'],
+        'every 6 hours': ['q6h', 'q 6h', 'every 6 hours', 'every 6 hrs'],
+    }
+
+    time_pattern = re.compile(r"\b(\d{1,2}):(\d{2})\s*(am|pm|AM|PM)\b\.?", re.IGNORECASE)
+    header_blockers = re.compile(
+        r"(dr\.?|doctor|physician|patient|dob|age|sex|gender|date|address|phone|license|allergies|weight|height|diagnosis|prescription|rx\s*no|reg\s*no)\b",
+        re.IGNORECASE
+    )
+    dosage_split_tokens = re.compile(r"\b(mg|mcg|g|ml|iu|units|tablet|tab|capsule|cap|drop|drops|cream|ointment)\b", re.IGNORECASE)
+    
+    # Multiple medicine line patterns for different prescription formats
+    med_line_patterns = [
+        re.compile(r"^\s*\d+\.?\s*([A-Za-z][A-Za-z0-9\-\s]{2,})\s+(\d+(?:\.\d+)?)\s*(mg|mcg|g|ml|iu)\b", re.IGNORECASE),  # "1. Medicine 500mg"
+        re.compile(r"^([A-Za-z][A-Za-z0-9\-\s]{2,})\s+(\d+(?:\.\d+)?)\s*(mg|mcg|g|ml|iu)\s*(tablet|tab|capsule|cap)?", re.IGNORECASE),  # "Medicine 500mg tablet"
+        re.compile(r"^\s*rx\s*[:\.]?\s*([A-Za-z][A-Za-z0-9\-\s]{2,})\s+(\d+(?:\.\d+)?)\s*(mg|mcg|g|ml)", re.IGNORECASE),  # "Rx: Medicine 500mg"
+        re.compile(r"^([A-Z][a-z]+\s+[A-Z][a-z]+)\s+(\d+(?:\.\d+)?)\s*(mg|mcg|g|ml)", re.IGNORECASE),  # "Medicine Name 500mg"
+        re.compile(r"^\s*([A-Za-z][A-Za-z0-9\-\s]{3,})\s*[,:]?\s*(\d+(?:\.\d+)?)\s*(mg|mcg|g|ml)\b", re.IGNORECASE),  # "Medicine: 500mg"
+    ]
+    
+    age_pattern = re.compile(r"\b(age|dob|yrs|years?)\b[\s:]*([0-9]{1,3})", re.IGNORECASE)
+    weight_pattern = re.compile(r"\b(weight|wt)\b[\s:]*([0-9]{1,3}(?:\.[0-9]+)?)\s*(kg|kgs|kilograms?)?\b", re.IGNORECASE)
+    height_pattern = re.compile(r"\b(height|ht)\b[\s:]*([0-9]{2,3}(?:\.[0-9]+)?)\s*(cm|cms|centimeters?)?\b", re.IGNORECASE)
+    purpose_pattern = re.compile(r"\b(purpose|indication|reason|for|diagnosis)\b\s*[:\-]\s*(.+)$", re.IGNORECASE)
+    allergies_pattern = re.compile(r"\ballerg(?:y|ies)\b\s*[:\-]\s*(.+)$", re.IGNORECASE)
+
+    extracted: Dict[str, Optional[str]] = { 'med_name': None, 'dosage': None, 'frequency': None, 'time': None }
+    extra: Dict[str, Optional[str]] = { 'purpose': None, 'age': None, 'age_group': None, 'weight': None, 'height': None, 'allergies': None }
+
+    for ln in lines:
+        # Try multiple medicine line patterns
+        if extracted['med_name'] is None or extracted['dosage'] is None:
+            for pattern in med_line_patterns:
+                ml = pattern.search(ln)
+                if ml:
+                    name = ml.group(1).strip(' -,:')
+                    # Handle different group structures
+                    if len(ml.groups()) >= 3:
+                        dose_value = ml.group(2) if ml.group(2) else ml.group(4)
+                        dose_unit = ml.group(3) if ml.group(3) else ml.group(5)
+                        if dose_value and dose_unit:
+                            dose = (dose_value + ' ' + dose_unit).strip()
+                            if extracted['med_name'] is None and len(name) >= 3:
+                                extracted['med_name'] = name
+                            if extracted['dosage'] is None:
+                                extracted['dosage'] = dose
+                            break  # Found a match, stop trying other patterns
+
+        # dosage - enhanced pattern matching
+        if extracted['dosage'] is None:
+            d = dosage_pattern.search(ln)
+            if d:
+                # Extract the full match, prioritizing grouped patterns
+                for group in d.groups():
+                    if group and group.strip():
+                        extracted['dosage'] = group.strip()
+                        break
+
+        # frequency
+        if extracted['frequency'] is None:
+            low = ln.lower()
+            for freq, keys in freq_map.items():
+                if any(k in low for k in keys):
+                    extracted['frequency'] = freq
+                    break
+
+        # explicit time (e.g., 9:00 AM)
+        if extracted['time'] is None:
+            t = time_pattern.search(ln)
+            if t:
+                extracted['time'] = t.group(1) + ' ' + t.group(2).upper()
+
+        # demographics and purpose/allergies
+        if extra['age'] is None:
+            am = age_pattern.search(ln)
+            if am:
+                try:
+                    age_val = int(am.group(2))
+                    extra['age'] = str(age_val)
+                    if age_val < 18:
+                        extra['age_group'] = 'pediatric'
+                    elif age_val >= 65:
+                        extra['age_group'] = 'elderly'
+                    else:
+                        extra['age_group'] = 'adult'
+                except Exception:
+                    pass
+        if extra['weight'] is None:
+            wm = weight_pattern.search(ln)
+            if wm:
+                extra['weight'] = wm.group(2)
+        if extra['height'] is None:
+            hm = height_pattern.search(ln)
+            if hm:
+                extra['height'] = hm.group(2)
+        if extra['purpose'] is None:
+            pm = purpose_pattern.search(ln)
+            if pm:
+                extra['purpose'] = pm.group(2).strip()
+        if extra['allergies'] is None:
+            alm = allergies_pattern.search(ln)
+            if alm:
+                extra['allergies'] = alm.group(1).strip()
+
+        # medicine name heuristic: first line that looks like a wordy token and not Doctor/Patient headers
+        if extracted['med_name'] is None:
+            if re.search(r"[A-Za-z]{3,}", ln) and not header_blockers.search(ln):
+                # remove leading bullets or numbering
+                cand = re.sub(r"^[\-\d\.\)\s]+", "", ln)
+                # remove leading rx markers like 'Rx', 'Rx1.', 'Rxi'
+                cand = re.sub(r"^r\s*x\s*i?\s*[:\.]?\s*\d*\)?\s*", "", cand, flags=re.IGNORECASE)
+                # strip common instructions
+                cand = re.sub(r"\b(tab|tablet|caps|capsule|cap|syrup|drop|drops|inj|injection|ointment|cream)\b\.?,?\s*", "", cand, flags=re.IGNORECASE)
+                # If dosage unit exists in same line, split name before it
+                split_match = dosage_split_tokens.search(cand)
+                name_part = cand
+                if split_match:
+                    name_part = cand[:split_match.start()].strip(' -,:')
+                # keep first 3 words max as name
+                words = name_part.split()
+                if words:
+                    extracted['med_name'] = " ".join(words[:3])
+
+        if all(extracted.values()):
+            break
+
+    # merge extra fields into response
+    for k, v in extra.items():
+        extracted[k] = v
+    return extracted
+
+def _preprocess_for_handwriting(image: Image.Image) -> Image.Image:
+    """Enhanced preprocessing specifically for handwritten text recognition"""
+    from PIL import ImageOps, ImageFilter, ImageEnhance
+    import numpy as np
+    
+    # Convert to grayscale if not already
+    if image.mode != 'L':
+        image = image.convert('L')
+    
+    # Convert to numpy for advanced processing
+    img_array = np.array(image)
+    
+    # 1. Denoise (median filter for handwritten text)
+    try:
+        from scipy import ndimage
+        img_array = ndimage.median_filter(img_array, size=3)
+    except ImportError:
+        # Fallback: PIL median filter
+        image = image.filter(ImageFilter.MedianFilter(size=3))
+        img_array = np.array(image)
+    
+    # 2. Enhance contrast aggressively for handwriting
+    image = Image.fromarray(img_array)
+    enhancer = ImageEnhance.Contrast(image)
+    image = enhancer.enhance(2.0)  # Increase contrast
+    
+    # 3. Auto-contrast
+    image = ImageOps.autocontrast(image, cutoff=5)
+    
+    # 4. Sharpen
+    image = image.filter(ImageFilter.SHARPEN)
+    
+    # 5. Binarization (OTSU-like thresholding for handwritten text)
+    try:
+        from scipy.ndimage import gaussian_filter
+        blurred = gaussian_filter(img_array, sigma=1.0)
+        threshold = np.mean(blurred)
+        binary = np.where(img_array > threshold * 0.9, 255, 0).astype(np.uint8)
+        image = Image.fromarray(binary, mode='L')
+    except ImportError:
+        # Fallback: simple threshold
+        image = ImageOps.autocontrast(image)
+    
+    return image
+
+# OCR functions moved to ocr_service.py
+
+def _paddleocr_text_from_image(image: Image.Image) -> str:
+    """PaddleOCR - Excellent for handwritten text with pretrained models"""
+    global _paddleocr_reader
+    if not PADDLEOCR_AVAILABLE:
+        raise RuntimeError('PaddleOCR not available')
+    if _paddleocr_reader is None:
+        # Initialize with English model, optimized for handwritten text
+        _paddleocr_reader = PaddleOCR(use_angle_cls=True, lang='en', use_gpu=False)
+    
+    import tempfile, os as _os
+    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+        image.save(tmp.name, format='PNG')
+        tmp_path = tmp.name
+    try:
+        results = _paddleocr_reader.ocr(tmp_path, cls=True)
+        # Extract text from results
+        text_lines = []
+        if results and results[0]:
+            for line in results[0]:
+                if line and len(line) >= 2:
+                    text_lines.append(line[1][0])  # text is at [1][0]
+        return "\n".join(text_lines)
+    finally:
+        try:
+            _os.remove(tmp_path)
+        except Exception:
+            pass
+
+def _trocr_text_from_image(image: Image.Image) -> str:
+    """TrOCR - Transformer-based OCR, best for handwritten text (pretrained model)"""
+    global _trocr_processor, _trocr_model
+    if not TROCR_AVAILABLE:
+        raise RuntimeError('TrOCR not available')
+    
+    # Lazy load model (first time only)
+    if _trocr_processor is None or _trocr_model is None:
+        # Use pretrained handwritten model
+        _trocr_processor = TrOCRProcessor.from_pretrained('microsoft/trocr-base-handwritten')
+        _trocr_model = VisionEncoderDecoderModel.from_pretrained('microsoft/trocr-base-handwritten')
+    
+    # Preprocess image
+    pixel_values = _trocr_processor(image, return_tensors="pt").pixel_values
+    
+    # Generate text
+    generated_ids = _trocr_model.generate(pixel_values)
+    generated_text = _trocr_processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    
+    return generated_text
+
+def _pytesseract_text_from_image(image: Image.Image, optimize_handwriting: bool = True) -> str:
+    if not OCR_AVAILABLE:
+        raise RuntimeError('Tesseract OCR not available')
+    
+    # Preprocess for handwritten text
+    if optimize_handwriting:
+        image = _preprocess_for_handwriting(image)
+    
+    # Use handwriting-optimized Tesseract config
+    custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,:/()%mgml- '
+    # PSM 6 = Assume a single uniform block of text (better for prescriptions)
+    # OEM 3 = Default OCR engine mode
+    
+    try:
+        text = pytesseract.image_to_string(image, config=custom_config)
+        # Fallback if custom config fails
+        if not text or len(text.strip()) < 5:
+            text = pytesseract.image_to_string(image, config='--psm 6')
+    except Exception:
+        # Final fallback without custom config
+        text = pytesseract.image_to_string(image)
+    
+    return text
+
+@app.route('/extract_prescription', methods=['POST'])
+def extract_prescription():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Not logged in'}), 401
+
+    # Check if OCR service is available
+    if not OCR_SERVICE_AVAILABLE or not is_ocr_available():
+        return jsonify({'success': False, 'error': 'EasyOCR not available. Install: pip install easyocr'}), 500
+
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'Empty filename'}), 400
+
+    try:
+        img_bytes = file.read()
+        image = Image.open(io.BytesIO(img_bytes)).convert('RGB')
+        
+        # Use OCR service to extract prescription data
+        result = extract_prescription_data(image)
+        
+        if result['success']:
+            return jsonify(result)
+        else:
+            return jsonify({'success': False, 'error': result.get('error', 'OCR extraction failed')}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/recommendations')
 def recommendations():
     if 'user_id' not in session:
@@ -401,10 +746,10 @@ def take_medicine():
         current_doses = medicine.get('daily_doses_taken', 0)
         total_required = medicine.get('total_doses_required', 1)
         
-        # Increment daily doses taken
+        # Incrementipon dose k;a daily
         new_doses = min(current_doses + 1, total_required)
         
-        # Update medicine with dose tracking
+        # Update database medipcipne vla
         query = """
             UPDATE user_medicines 
             SET daily_doses_taken = %s,
@@ -415,14 +760,14 @@ def take_medicine():
         """
         execute_query(query, (new_doses, medicine_id, user_id))
         
-        # Gamification: Award points and update streak
+        # Gameipfiped : bdge vgera k; liye
         points = 0
         if GAMIFICATION_ENABLED and gamification_engine:
             points = gamification_engine.calculate_points(user_id, medicine_id, dose_taken=True, on_time=True)
             gamification_engine.add_points(user_id, points)
             new_streak = gamification_engine.update_streak(user_id)
             
-            # Check for badges
+            # bdge chk;r
             if new_streak == 1:
                 gamification_engine.award_badge(user_id, 'first_dose')
             elif new_streak == 7:
@@ -452,7 +797,7 @@ def miss_medicine():
         user_id = session['user_id']
         medicine_id = request.json.get('medicine_id')
         
-        # Update adherence score for missed dose
+        # Update k;rega adherence score missed k; liye
         query = """
             UPDATE user_medicines 
             SET adherence_score = GREATEST(adherence_score - 10, 0)
@@ -476,7 +821,7 @@ def remove_medicine():
         if not medicine_id:
             return jsonify({'success': False, 'error': 'Medicine ID required'})
         
-        # Update medicine status to '0' instead of deleting
+        # Update medicine status to '0'
         query = """
             UPDATE user_medicines 
             SET status = '0'

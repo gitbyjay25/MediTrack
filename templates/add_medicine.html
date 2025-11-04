@@ -17,6 +17,28 @@
 
     <!-- Form -->
     <div class="bg-white rounded-xl shadow-lg p-8">
+        <!-- Prescription Upload for Auto-Fill -->
+        <div class="mb-6 p-4 border border-dashed border-purple-300 rounded-lg bg-purple-50">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas fa-file-medical text-2xl text-purple-500 mr-3"></i>
+                    <div>
+                        <div class="font-semibold text-gray-800">Auto-fill from Prescription</div>
+                        <div class="text-sm text-gray-600">Upload a clear photo of your printed prescription to extract medicine details</div>
+                    </div>
+                </div>
+                <div>
+                    <input id="prescription_file" type="file" accept="image/*,.jpg,.jpeg,.png" class="hidden" />
+                    <button type="button" onclick="document.getElementById('prescription_file').click()" class="px-4 py-2 bg-white border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-100">
+                        <i class="fas fa-upload mr-2"></i>Select Image
+                    </button>
+                    <button type="button" id="extract_btn" class="ml-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50" disabled>
+                        <i class="fas fa-magic mr-2"></i>Extract
+                    </button>
+                </div>
+            </div>
+            <div id="extract_status" class="text-sm text-gray-600 mt-3"></div>
+        </div>
         <form method="POST" action="/add_medicine" class="space-y-6">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -39,21 +61,6 @@
                     <i class="fas fa-info-circle mr-1"></i>
                     For tablets: 500mg | For creams: 2% | For syrups: 10ml | For drops: 1 drop
                 </p>
-            </div>
-            
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    <i class="fas fa-clock mr-2 text-purple-500"></i>Frequency
-                </label>
-                <select name="frequency" required 
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all">
-                    <option value="">Select frequency</option>
-                    <option value="once daily">Once Daily</option>
-                    <option value="twice daily">Twice Daily</option>
-                    <option value="three times daily">Three Times Daily</option>
-                    <option value="every 8 hours">Every 8 Hours</option>
-                    <option value="every 12 hours">Every 12 Hours</option>
-                </select>
             </div>
             
             <div>
@@ -181,6 +188,107 @@
 </div>
 
 <script>
+const fileInput = document.getElementById('prescription_file');
+const extractBtn = document.getElementById('extract_btn');
+const extractStatus = document.getElementById('extract_status');
+
+fileInput.addEventListener('change', function() {
+    extractBtn.disabled = !fileInput.files || fileInput.files.length === 0;
+    if (fileInput.files && fileInput.files.length > 0) {
+        extractStatus.textContent = `Selected: ${fileInput.files[0].name}`;
+    }
+});
+
+extractBtn.addEventListener('click', function() {
+    if (!fileInput.files || fileInput.files.length === 0) return;
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('engine', 'easyocr');
+    extractStatus.textContent = 'Extracting text from image...';
+    extractBtn.disabled = true;
+    fetch('/extract_prescription', {
+        method: 'POST',
+        body: formData
+    }).then(r => {
+        if (!r.ok) {
+            throw new Error(`Server error: ${r.status} ${r.statusText}`);
+        }
+        return r.json();
+    })
+      .then(res => {
+        if (!res.success) {
+            extractStatus.textContent = 'Extraction failed: ' + (res.error || 'Unknown error');
+            extractBtn.disabled = false;
+            return;
+        }
+        const data = res.data || {};
+        const engine = res.engine ? ` (engine: ${res.engine})` : '';
+        const warn = res.warning ? ` - ${res.warning}` : '';
+        if (data.med_name) {
+            document.getElementById('med_name').value = data.med_name;
+        }
+        if (data.dosage) {
+            const dosageInput = document.querySelector('input[name="dosage"]');
+            if (dosageInput && !dosageInput.value) dosageInput.value = data.dosage;
+        }
+        if (data.frequency) {
+            const freqSelect = document.querySelector('select[name="frequency"]');
+            if (freqSelect) freqSelect.value = data.frequency;
+            const evt = new Event('change');
+            freqSelect && freqSelect.dispatchEvent(evt);
+        }
+        if (data.time) {
+            const reminderTimes = document.getElementById('reminder-times');
+            if (reminderTimes) {
+                reminderTimes.innerHTML = '';
+                window.reminderCount = 0;
+                if (typeof addReminderTimeWithValue === 'function') {
+                    const to24h = (t) => {
+                        try {
+                            const m = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+                            if (!m) return '09:00';
+                            let hh = parseInt(m[1], 10);
+                            const mm = m[2];
+                            const ap = m[3].toUpperCase();
+                            if (ap === 'PM' && hh !== 12) hh += 12;
+                            if (ap === 'AM' && hh === 12) hh = 0;
+                            return String(hh).padStart(2, '0') + ':' + mm;
+                        } catch { return '09:00'; }
+                    };
+                    addReminderTimeWithValue(to24h(data.time));
+                }
+            }
+        }
+        if (data.purpose) {
+            const purpose = document.querySelector('textarea[name="purpose"]');
+            if (purpose && !purpose.value) purpose.value = data.purpose;
+        }
+        if (data.weight) {
+            const weight = document.querySelector('input[name="weight"]');
+            if (weight && !weight.value) weight.value = data.weight;
+        }
+        if (data.height) {
+            const height = document.querySelector('input[name="height"]');
+            if (height && !height.value) height.value = data.height;
+        }
+        if (data.allergies) {
+            const allergies = document.querySelector('textarea[name="allergies"]');
+            if (allergies && !allergies.value) allergies.value = data.allergies;
+        }
+        if (data.age_group) {
+            const ag = document.querySelector('select[name="age_group"]');
+            if (ag) ag.value = data.age_group;
+        }
+        extractStatus.textContent = 'Extraction complete. Review and submit' + engine + warn + '.';
+        extractBtn.disabled = false;
+      })
+      .catch(err => {
+        console.error('Extraction error:', err);
+        extractStatus.textContent = 'Extraction error: ' + (err.message || 'Server not responding. Make sure Flask server is running.');
+        extractBtn.disabled = false;
+      });
+});
+
 document.getElementById('med_name').addEventListener('input', function() {
     const query = this.value;
     const suggestions = document.getElementById('medicine_suggestions');

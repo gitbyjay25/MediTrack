@@ -21,9 +21,9 @@ class DrugInteractionEngine:
                 self.tfidf = pickle.load(f)
             with open('ml/Models/interaction_label_encoder.pkl', 'rb') as f:
                 self.label_encoder = pickle.load(f)
-            print("✅ Drug Interaction ML Model loaded successfully!")
+            print(" Drug Interaction ML Model loaded successfully!")
         except FileNotFoundError:
-            print("⚠️ Drug Interaction ML Model files not found, using database lookup")
+            print(" Drug Interaction ML Model files not found, using database lookup")
             self.model = None
     
     def predict_interaction_severity(self, drug1, drug2):

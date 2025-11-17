@@ -14,18 +14,18 @@ class DosageOptimizationEngine:
     
     def load_model(self):
         try:
-            # Try to load trained model files
+            
             with open('ml/Models/dosage_model.pkl', 'rb') as f:
                 self.model = pickle.load(f)
             with open('ml/Models/dosage_tfidf.pkl', 'rb') as f:
                 self.tfidf = pickle.load(f)
-            print("✅ Dosage Optimization ML Model loaded successfully!")
+            print("dosase mdl loaded")
         except FileNotFoundError:
-            print("⚠️ Dosage Optimization ML Model files not found, using database lookup")
+            print("dsg mdlnto fnd , db lookup")
             self.model = None
     
     def extract_dosage_value(self, dosage_text):
-        """Extract numerical dosage value from text"""
+        """num dosage val frm text"""
         if not dosage_text:
             return 0
         
@@ -41,15 +41,15 @@ class DosageOptimizationEngine:
             return self.get_database_dosage(medicine_name, age_group)
         
         try:
-            # Prepare input features
+            
             features = f"{medicine_name} {age_group}"
             if weight:
                 features += f" {weight}kg"
             
-            # Transform using TF-IDF
+            # Trnfrmg using TF-IDf
             X = self.tfidf.transform([features])
             
-            # Get prediction
+            
             predicted_dosage = self.model.predict(X)[0]
             
             return {
@@ -64,7 +64,7 @@ class DosageOptimizationEngine:
             return self.get_database_dosage(medicine_name, age_group)
     
     def get_database_dosage(self, medicine_name, age_group='adult'):
-        """Get dosage from database"""
+        
         query = """
             SELECT * FROM dosage_optimization 
             WHERE medicine_name LIKE %s
@@ -87,7 +87,7 @@ class DosageOptimizationEngine:
             
             return {
                 'predicted_dosage': dosage_value,
-                'confidence': 0.9,  # High confidence for database results
+                'confidence': 0.9,  
                 'source': 'Database',
                 'recommendation': f"Database suggests {dosage_text} for {age_group}",
                 'full_dosage_info': dosage_data
@@ -96,8 +96,8 @@ class DosageOptimizationEngine:
         return None
     
     def get_dosage_recommendations(self, user_id):
-        """Get dosage recommendations for user's medicines"""
-        # Get user's medicines with age group and weight
+        
+        
         query = """
             SELECT medicine_name, dosage, age_group, weight FROM user_medicines 
             WHERE user_id = %s AND status = 'active'
@@ -112,7 +112,7 @@ class DosageOptimizationEngine:
             age_group = med['age_group'] or 'adult'
             weight = med['weight']
             
-            # Get optimal dosage
+            # optml dosg
             optimal = self.predict_optimal_dosage(medicine_name, age_group, weight)
             
             if optimal:
@@ -129,5 +129,5 @@ class DosageOptimizationEngine:
         
         return recommendations
 
-# Global instance
+
 dosage_engine = DosageOptimizationEngine()

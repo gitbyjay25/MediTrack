@@ -124,11 +124,11 @@ def extract_text_from_image(image: Image.Image) -> str:
             pass
 
 def parse_prescription_text(text: str) -> Dict[str, Optional[str]]:
-    """Parse multiple medicines (name, dosage, frequency) and other fields from OCR text"""
+    """Parse multiple medicines (name, dosage, frequency) and patient details from OCR text"""
     lines = re.split(r'[\n\r]+', text)
     lines = [ln.strip() for ln in lines if ln.strip()]
 
-    # Smart merge for OCR artifacts like "Rx" + "I. Amlodipine"
+    # Merge broken "Rx" lines
     merged_lines = []
     skip_next = False
     for i, ln in enumerate(lines):
@@ -137,7 +137,7 @@ def parse_prescription_text(text: str) -> Dict[str, Optional[str]]:
             continue
         if re.fullmatch(r'(R|Rx|RxI|Rx1|Rxi|Rxl)\.?\s*', ln.strip(), re.IGNORECASE):
             if i + 1 < len(lines):
-                merged_lines.append(f"{ln.strip()} {lines[i+1].strip()}")
+                merged_lines.append(f"{ln.strip()} {lines[i + 1].strip()}")
                 skip_next = True
             else:
                 merged_lines.append(ln)
@@ -145,15 +145,16 @@ def parse_prescription_text(text: str) -> Dict[str, Optional[str]]:
             merged_lines.append(ln)
     lines = merged_lines
 
-    # === DEBUG ===
+    # Debug merged lines
     print("\nDebug: Merged Lines:")
     for i, ln in enumerate(lines):
         print(f"{i+1:02d}: {ln}")
-    # ==============
 
+    # Data structure
     data = {
         'medicines': [],
         'age': None,
+        'age_group': None,
         'weight': None,
         'height': None,
         'gender': None,
@@ -168,17 +169,18 @@ def parse_prescription_text(text: str) -> Dict[str, Optional[str]]:
         'as needed': ['sos', 'prn', 'as needed']
     }
 
+    # Extract medicines
     for ln in lines:
         if not ln:
             continue
 
-        # Skip obvious non-med lines
+        # Skip non-medicine lines
         if re.search(
             r'\b(phone|address|license|npi|health|avenue|business|city|clinic|hospital|street|road|block|internal|specialist|patient|date|dob|dr|doctor|allergies|gender|weight|height|purpose|penicillin)\b',
             ln, re.IGNORECASE):
             continue
 
-        # Skip instruction lines like "Take one tablet..."
+        # Skip instructions
         if re.match(r'^(take|give|apply|use)\b', ln, re.IGNORECASE):
             continue
 
@@ -186,12 +188,12 @@ def parse_prescription_text(text: str) -> Dict[str, Optional[str]]:
         if not re.search(r'(mg|ml|tab|tablet|cap|capsule|syrup|drop|ointment|cream)', ln, re.IGNORECASE):
             continue
 
-        # Clean text
+        # Clean line
         cand = re.sub(r"^[\-\d\.\)\s]+", "", ln)
         cand = re.sub(r"^r\s*x\s*\d*\s*[:\.]?\s*", "", cand, flags=re.IGNORECASE)
         cand = re.sub(r'^\b[IVX]+\.\s*', '', cand, flags=re.IGNORECASE)
 
-        # Extract medicine + dosage
+        # Extract medicine name + dosage
         match = re.search(r"([A-Za-z][A-Za-z0-9\-]+)\s+(\d+(?:\.\d+)?)\s*(mg|ml|mcg|g|iu)?", cand, re.IGNORECASE)
         if not match:
             continue
@@ -199,7 +201,7 @@ def parse_prescription_text(text: str) -> Dict[str, Optional[str]]:
         med_name = match.group(1).capitalize()
         dose = match.group(2) + " " + (match.group(3) or "")
 
-        # Detect frequency words
+        # Detect frequency
         freq = None
         lower_ln = ln.lower()
         for key, words in freq_keywords.items():
@@ -207,7 +209,7 @@ def parse_prescription_text(text: str) -> Dict[str, Optional[str]]:
                 freq = key
                 break
 
-        # Add to medicines list if unique
+        # Store if unique
         if not any(m['name'].lower() == med_name.lower() for m in data['medicines']):
             data['medicines'].append({
                 'name': med_name,
@@ -215,12 +217,11 @@ def parse_prescription_text(text: str) -> Dict[str, Optional[str]]:
                 'frequency': freq
             })
 
-    # Debug output
-    print("\nExtracted structured medicines:")
+    print("\n✅ Extracted structured medicines:")
     for m in data['medicines']:
         print(m)
 
-    # Still parse other fields (optional)
+    # Extract patient details
     for ln in lines:
         # Age
         if not data['age']:
@@ -238,15 +239,69 @@ def parse_prescription_text(text: str) -> Dict[str, Optional[str]]:
             if m:
                 data['height'] = m.group(2)
         # Gender
+        # Gender
         if not data['gender']:
-            m = re.search(r"\b(gender|sex)\b[\s:]*([A-Za-z]+)", ln, re.IGNORECASE)
+            # 🔍 Debug print to see OCR line
+            print(f"🔍 Checking line for gender: {ln}")
+
+            # Match all possible OCR variants like:
+            # "Gender: Male", "Gender : Ma1e", "Sex- F", "GENDER Male", "Sex | Female"
+            m = re.search(
+                r"\b(gender|sex)\b[\s:;=\-\|]*([A-Za-z0-9]+)",
+                ln, re.IGNORECASE
+            )
+
             if m:
-                data['gender'] = m.group(2)
+                g = m.group(2).lower()
+                g = g.replace('1', 'l').replace('0', 'o').replace('|', 'l').replace('€', 'e')
+                print(f"✅ Gender pattern matched: {g}")
+
+                if g.startswith('m'):
+                    data['gender'] = 'Male'
+                elif g.startswith('f'):
+                    data['gender'] = 'Female'
+                elif g.startswith('o'):
+                    data['gender'] = 'Other'
+
+            else:
+                # 🔁 Backup: search for standalone words if label missing
+                if re.search(r'\bmale\b', ln, re.IGNORECASE):
+                    print("✅ Found standalone 'male'")
+                    data['gender'] = 'Male'
+                elif re.search(r'\bfemale\b', ln, re.IGNORECASE):
+                    print("✅ Found standalone 'female'")
+                    data['gender'] = 'Female'
+                elif re.search(r'\bother\b', ln, re.IGNORECASE):
+                    print("✅ Found standalone 'other'")
+                    data['gender'] = 'Other'
+
         # Purpose
         if not data['purpose']:
             m = re.search(r"(purpose|for)\s*[:\-]?\s*(.+)", ln, re.IGNORECASE)
             if m:
                 data['purpose'] = m.group(2).strip()
+
+    # Determine age group
+    if data['age']:
+        try:
+            age_val = int(data['age'])
+            if age_val < 18:
+                data['age_group'] = "pediatric"
+            elif 18 <= age_val < 65:
+                data['age_group'] = "adult"
+            else:
+                data['age_group'] = "elderly"
+        except ValueError:
+            data['age_group'] = None
+
+    # --- ✅ Backward compatibility for templates ---
+    if data.get('medicines'):
+        first_med = data['medicines'][0]
+        data['med_name'] = first_med.get('name')
+        data['dosage'] = first_med.get('dosage')
+        data['frequency'] = first_med.get('frequency')
+    # -------------------------------------------------
+    print("\n🧩 RETURNING DATA TO FRONTEND:", data)
 
     return data
 
